@@ -48,6 +48,7 @@ truncate -s 32768 "${BUILD_TMP}/stub.o"
 cat "${BUILD_TMP}/stub.o" "${BUILD_TMP}/${APP}.o" > "${BUILD_DIR}/${APP}.bin"
 
 cp "/tamago-build/config.txt" "${BUILD_DIR}/config.txt"
+echo "kernel=${APP}.bin" >> "${BUILD_DIR}/config.txt"
 
 rm -rf "${BUILD_TMP}"
 
