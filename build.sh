@@ -4,6 +4,7 @@ FIRMWAREURL="https://raw.githubusercontent.com/raspberrypi/firmware/master/boot/
 
 ROOT="$(pwd)"
 BUILD_DIR="${ROOT}/build"
+BUILD_TMP=$(mktemp -d)
 mkdir -p $BUILD_DIR
 
 SRC_DIR="$(pwd)/$1"
@@ -26,31 +27,27 @@ export GOARCH=arm
 
 TEXT_START=0x00010000 # Space for interrupt vector, etc
 
-/usr/local/tamago-go/bin/go build -ldflags "-s -w -T ${TEXT_START} -E _rt0_arm_tamago -R 0x1000" -o "${BUILD_DIR}/${APP}" "$SRC_DIR"
-objdump -D "${BUILD_DIR}/${APP}" > "${BUILD_DIR}/${APP}.list"
+/usr/local/tamago-go/bin/go build -ldflags "-s -w -T ${TEXT_START} -E _rt0_arm_tamago -R 0x1000" -o "${BUILD_TMP}/${APP}" "$SRC_DIR"
+objdump -D "${BUILD_TMP}/${APP}" > "${BUILD_TMP}/${APP}.list"
 
 objcopy -j .text -j .rodata -j .shstrtab -j .typelink \
   -j .itablink -j .gopclntab -j .go.buildinfo -j .noptrdata -j .data \
   -j .bss --set-section-flags .bss=alloc,load,contents \
   -j .noptrbss --set-section-flags .noptrbss=alloc,load,contents \
-  "${BUILD_DIR}/${APP}" -O binary "${BUILD_DIR}/${APP}.o"
+  "${BUILD_TMP}/${APP}" -O binary "${BUILD_TMP}/${APP}.o"
 
-ENTRY_POINT=$(readelf -e "${BUILD_DIR}/${APP}" | grep Entry | sed 's/.*\(0x[a-zA-Z0-9]*\).*/\1/')
-gcc -D ENTRY_POINT="${ENTRY_POINT}" -c /tamago-build/boot.S -o "${BUILD_DIR}/boot.o"
+ENTRY_POINT=$(readelf -e "${BUILD_TMP}/${APP}" | grep Entry | sed 's/.*\(0x[a-zA-Z0-9]*\).*/\1/')
+gcc -D ENTRY_POINT="${ENTRY_POINT}" -c /tamago-build/boot.S -o "${BUILD_TMP}/boot.o"
 
-objcopy "${BUILD_DIR}/boot.o" -O binary "${BUILD_DIR}/stub.o"
+objcopy "${BUILD_TMP}/boot.o" -O binary "${BUILD_TMP}/stub.o"
 
 # Truncate pads the stub out to correctly align the binary
 # 32768 = 0x10000 (TEXT_START) - 0x8000 (Default kernel load address)
-truncate -s 32768 "${BUILD_DIR}/stub.o"
+truncate -s 32768 "${BUILD_TMP}/stub.o"
 
-cat "${BUILD_DIR}/stub.o" "${BUILD_DIR}/${APP}.o" > "${BUILD_DIR}/${APP}.bin"
+cat "${BUILD_TMP}/stub.o" "${BUILD_TMP}/${APP}.o" > "${BUILD_DIR}/${APP}.bin"
 
 cp "/tamago-build/config.txt" "${BUILD_DIR}/config.txt"
 
-rm "${BUILD_DIR}/${APP}"
-rm "${BUILD_DIR}/${APP}.o"
-rm "${BUILD_DIR}/${APP}.list"
-rm "${BUILD_DIR}/boot.o"
-rm "${BUILD_DIR}/stub.o"
+rm -rf "${BUILD_TMP}"
 
