@@ -1,10 +1,14 @@
 ARG TAMAGO_VERSION=1.16.4
 
-# If downloading binary build from Github
+# If compiling from source
 FROM golang:$TAMAGO_VERSION as tamago_go
 
 ARG TAMAGO_VERSION
-RUN curl -L https://github.com/f-secure-foundry/tamago-go/releases/download/tamago-go${TAMAGO_VERSION}/tamago-go${TAMAGO_VERSION}.linux-amd64.tar.gz | tar -zxf - -C /
+
+RUN cd /usr/local && \
+    git clone --depth 1 --branch "tamago${TAMAGO_VERSION}" "https://github.com/f-secure-foundry/tamago-go"
+RUN cd /usr/local/tamago-go/src && \
+    ./all.bash
 
 # Resulting image
 FROM multiarch/crossbuild
